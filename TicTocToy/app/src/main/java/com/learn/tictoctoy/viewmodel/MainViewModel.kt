@@ -1,59 +1,64 @@
 package com.learn.tictoctoy.viewmodel
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.learn.tictoctoy.model.TicTocToyModel
-
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 class MainViewModel : ViewModel() {
 
-    private val ticTocToyModel = TicTocToyModel()
+    private var ticTocToyModel = TicTocToyModel()
 
-    private val _ownAction = MutableLiveData<Map<String, String>>()
-    val ownAction: LiveData<Map<String, String>> = _ownAction
+    private val _ownActionHistory = MutableStateFlow<List<Map<String, String>>>(emptyList())
+    val ownActionHistory: StateFlow<List<Map<String, String>>> = _ownActionHistory
 
-    private val _computerAction = MutableLiveData<Map<String, String>>()
-    val computerAction: LiveData<Map<String, String>> = _computerAction
+    private val _computerActionHistory = MutableStateFlow<List<Map<String, String>>>(emptyList())
+    val computerActionHistory: StateFlow<List<Map<String, String>>> = _computerActionHistory
 
-    private val _winner = MutableLiveData(false)
-    val winner: LiveData<Boolean> = _winner
+    private val _winner = MutableStateFlow("")
+    val winner: StateFlow<String> = _winner
 
     fun setOwnAction(position: String) {
-        if (_winner.value == true) return
+        if (_winner.value.isNotEmpty()) return
 
-        _ownAction.value = mapOf(
+        val action = mapOf(
             "position" to position,
             "action" to "X"
         )
         ticTocToyModel.updateOwnChoice(position, "X")
+        _ownActionHistory.value = _ownActionHistory.value + action
+
         val winnerResult = ticTocToyModel.checkResult("X")
         if (winnerResult.win) {
-            _winner.value = true
+            _winner.value = "Player (${winnerResult.choice}) Wins!"
         } else {
             handleComputerTurn()
         }
     }
 
     fun handleComputerTurn() {
-        val computerPosition = ticTocToyModel.getComputerChoice()
-        if (computerPosition.isEmpty()) return
+        val position = ticTocToyModel.getComputerChoice()
+        if (position.isEmpty()) {
+            _winner.value = "Game draw"
+            return
+        }
 
-        _computerAction.value = mapOf(
-            "position" to computerPosition,
+        val action = mapOf(
+            "position" to position,
             "action" to "O"
         )
+        _computerActionHistory.value = _computerActionHistory.value + action
+
         val winnerResult = ticTocToyModel.checkResult("O")
         if (winnerResult.win) {
-            _winner.value = true
+            _winner.value = "Computer (${winnerResult.choice}) Wins!"
         }
     }
 
     fun resetGame() {
         ticTocToyModel.resetGame()
-        _ownAction.value = emptyMap()
-        _computerAction.value = emptyMap()
-        _winner.value = false
+        _ownActionHistory.value = emptyList()
+        _computerActionHistory.value = emptyList()
+        _winner.value = ""
     }
-
 }

@@ -1,12 +1,15 @@
 package com.learn.tictoctoy
 
 import android.os.Bundle
-import android.util.Log
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.learn.tictoctoy.databinding.ActivityMainBinding
 import com.learn.tictoctoy.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -24,26 +27,46 @@ class MainActivity : AppCompatActivity() {
 
         setupObservers()
         setupClickListeners()
+
+        binding.newGame.setOnClickListener {
+            viewModel.resetGame()
+            resetBoardUI()
+        }
     }
 
     private fun setupObservers() {
-        viewModel.ownAction.observe(this) { actionMap ->
-            val position = actionMap["position"]
-            val action = actionMap["action"]
-            Log.d(TAG, "Player move: $position -> $action")
-            updateValue(position, action)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.ownActionHistory.collect { actions ->
+                    actions.forEach { actionMap ->
+                        val position = actionMap["position"]
+                        val action = actionMap["action"]
+                        updateValue(position, action)
+                    }
+                }
+            }
         }
 
-        viewModel.computerAction.observe(this) { actionMap ->
-            val position = actionMap["position"]
-            val action = actionMap["action"]
-            Log.d(TAG, "Computer move: $position -> $action")
-            updateValue(position, action)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.computerActionHistory.collect { actions ->
+                    actions.forEach { actionMap ->
+                        val position = actionMap["position"]
+                        val action = actionMap["action"]
+                        updateValue(position, action)
+                    }
+                }
+            }
         }
 
-        viewModel.winner.observe(this) { hasWinner ->
-            Log.d(TAG, "Game ended: Winner = $hasWinner")
-            binding.showResult.text = if (hasWinner) "Game Over: Win" else "Game Running"
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.winner.collect { winnerText ->
+                    binding.showResult.text =
+//                        if (winnerText.isNotEmpty()) winnerText else "Game Running"
+                        winnerText.ifEmpty { "Game Running" }
+                }
+            }
         }
     }
 
@@ -53,35 +76,29 @@ class MainActivity : AppCompatActivity() {
                 viewModel.setOwnAction(id)
             }
         }
-
-        binding.newGame.setOnClickListener {
-            viewModel.resetGame()
-            textViewPairs.forEach { (textView, id) ->
-                textView.text = ""
-            }
-        }
     }
 
     private fun updateValue(position: String?, action: String?) {
         if (position == null || action == null) return
-
-        textViewPairs.find { it.second == position }?.first?.let { view ->
-            view.text = action
-            view.isClickable = false
+        textViewPairs.find { it.second == position }?.first?.let { textView ->
+            textView.text = action
+            textView.isClickable = false
         }
+    }
+
+    private fun resetBoardUI() {
+        textViewPairs.forEach { (textView, _) ->
+            textView.text = ""
+            textView.isClickable = true
+        }
+        binding.showResult.text = "Game Running"
     }
 
     private fun getTextViewIdPairs(): List<Pair<TextView, String>> {
         return listOf(
-            binding.tv11 to "tv11",
-            binding.tv12 to "tv12",
-            binding.tv13 to "tv13",
-            binding.tv21 to "tv21",
-            binding.tv22 to "tv22",
-            binding.tv23 to "tv23",
-            binding.tv31 to "tv31",
-            binding.tv32 to "tv32",
-            binding.tv33 to "tv33"
+            binding.tv11 to "tv11", binding.tv12 to "tv12", binding.tv13 to "tv13",
+            binding.tv21 to "tv21", binding.tv22 to "tv22", binding.tv23 to "tv23",
+            binding.tv31 to "tv31", binding.tv32 to "tv32", binding.tv33 to "tv33"
         )
     }
 
